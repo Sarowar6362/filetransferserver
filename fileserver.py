@@ -5,10 +5,7 @@ from flask_cors import CORS
 app = Flask(__name__) 
 CORS(app)
 UPLOAD_FOLDER = 'uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)  
-
-
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB 
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -20,23 +17,23 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
     
-    # Save the file in the uploads folder
+    # Save the file in chunks to avoid memory issues
     filename = file.filename
     filepath = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(filepath)
+    
+    with open(filepath, 'wb') as f:
+        for chunk in file.stream:
+            f.write(chunk)
     
     # Respond with a success message
-    response = jsonify({'message': f'File {filename} uploaded successfully!'})
-    print(response.get_data(as_text=True))  
-    return response
-
+    return jsonify({'message': f'File {filename} uploaded successfully!'})
 
 @app.route('/download/<filename>', methods=['GET'])
 def download_file(filename):
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     
     if os.path.exists(filepath):
-        return send_from_directory(UPLOAD_FOLDER, filename)
+        return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
     else:
         return jsonify({'error': 'File not found'}), 404
 
